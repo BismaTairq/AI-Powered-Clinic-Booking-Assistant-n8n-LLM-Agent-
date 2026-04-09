@@ -54,17 +54,7 @@ This project introduces an AI-driven conversational assistant that:
 ---
 
 ## 🏗️ Architecture
-Frontend Chat UI → n8n Webhook → Router Agent
-                                  ↓
-                    ┌─────────────┴─────────────┐
-                    ↓                           ↓
-        Appointment Booking Agent     Conversational Agent
-                    ↓                           ↓
-              Tools / APIs                LLM Response
-                    ↓                           ↓
-                Respond to Webhook → Frontend UI
-
-
+<img width="760" height="289" alt="Screenshot 2026-04-09 215637" src="https://github.com/user-attachments/assets/7eddc5e2-b653-4bbd-afa7-02772de8f4b9" />
 
 ---
 
