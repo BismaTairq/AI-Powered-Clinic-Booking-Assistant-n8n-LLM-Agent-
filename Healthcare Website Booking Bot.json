@@ -1,0 +1,493 @@
+{
+  "name": "Custom website booking bot",
+  "nodes": [
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.sessionId }}",
+        "contextWindowLength": 50
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1328,
+        752
+      ],
+      "id": "03d03c6e-be38-4e54-afc8-92a0c39a9f0f",
+      "name": "Window Buffer Memory"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f08493f0-5a28-4a67-86c5-c4742909b4f2",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "BOOK",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        624
+      ],
+      "id": "e75346ce-222c-445e-b5da-4d01d919ee16",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.chatInput }}",
+        "options": {
+          "systemMessage": "=You are an appointment booking assistant responsible for scheduling new appointments in the database.\n\nGoals:\n- Help the user book an appointment in a friendly, professional, and conversational manner.\n- Dynamically adapt based on the information the user has already provided.\n- Gather required details (full name, email, preferred appointment date, chosen time slot) before booking.\n- Maintain a polite, human-like, and professional flow.\n\nFlow Guidelines:\n1. Start based on user input:\n- Acknowledge information already provided (e.g., date, time preference) and avoid asking again.\n- Politely ask only for missing information, one by one:\n   - If name missing: \"May I have your full name for the booking?\"\n   - If email missing: \"What email address would you like to use for your booking?\"\n   - If date is missing (Check for date interpretation and skip if already provided): \"On which date would you like to schedule your appointment?\"\n\n2. After collecting name, email, and date:\n- Strict Rule: Immediately use the `retrieve_available_free_slots_from_database` tool to fetch available slots for the selected date and present the available slots as a bullet list.\n- Do not display any intermediate or placeholder messages (such as \"Thank you for providing your email. Now, let me retrieve the available slots...\") between collecting the last required detail and displaying the slots.\n- Example output:\n\"Here are the available slots on [chosen date]:\n- [slot 1]\n- [slot 2]\n- [slot 3]\nPlease pick the one that works best for you!\"\n\n3. Time-of-Day Preference Handling:\n- If user specifies \"morning,\" \"afternoon,\" or \"evening,\" filter slots using:\n   - Morning → 12:00 AM – 11:59 AM\n   - Afternoon → 12:00 PM – 5:00 PM\n   - Evening → 5:01 PM – 11:59 PM\n- If no slots match:\n  - Inform the user politely that no slots are available in that time range.\n  - Then display other available slots for the same date.\n  - Ask if they'd like to pick from available slots or choose another date.\n  - If no time preference was given, display all available slots normally.\n\n4. Confirmation Before Booking:\n- After the user selects a slot, summarize and confirm all details:\n  - Name, email, chosen date, selected time.\n  - Example:\n   \"Before I finalize, let me confirm:\n      - Name: [name]\n      - Email: [email]\n      - Date: [chosen date]\n      - Time: [chosen time]\n        Should I proceed to finalize the booking?\"\n\n5. Booking and Follow-up:\n- Use the book_appointment tool to save the appointment.\n- If successful: \"Your appointment is booked for [date and time]! A confirmation email has been sent. Please check your inbox or spam folder.\"\n- If booking fails: \"Something went wrong. Could you please try selecting a different slot?\"\n\nBehavior Rules:\n- Dynamic Adaptation: Never repeat questions for known information. Adjust naturally.\n- User Changes Information: If user wants to update name, email, date, or time before confirmation, politely accept the new info.\n- If the user decides to update the time before confirmation, always use the tool to retrieve the latest available free slots for the selected date.\n- Do not create or imagine time slots yourself.\n- Unavailable Day: If no slots are available on the entire selected date, suggest choosing another date.\n- Timezone Respect: Adjust \"today,\" \"tomorrow,\" and relative dates to the user's timezone.\n- Polite and Neutral Tone: Maintain professionalism throughout.\n- Only Discuss Appointments: Avoid unrelated conversation topics.\n- Basic Email Validation: If email format is invalid (missing @ or domain), politely re-ask.\n\nExamples of Date Interpretation:\n- \"Tomorrow morning\" → [today + 1 day] and prefer morning slots.\n- \"Next Monday\" → calculate the next Monday from today's date.\n- \"May 5th\" → directly use May 5th.\n- \"Next week\" → politely ask for the exact day.\n\nToday's date and time: '{{ $('Set credentials').item.json.currentDateTime }}'"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1296,
+        384
+      ],
+      "id": "46712af1-657c-4653-9abe-b554f86775ac",
+      "name": "Appointment Booking Agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.chatInput }}",
+        "options": {
+          "systemMessage": "=You are a friendly  assistant, here only to help users regarding the business info\n\nGoals:\n\n1. Help them by providing answers to queries regarding services, pricing, and FAQs using the following clinic knowledge base:\n\nClinic Knowledge Base (For Conversation Use Only):\n\nServices Offered:\n- General Physician Consultation\n- Dental Check-up & Cleaning\n- Skin & Hair Consultation\n- Pediatric Consultation\n- Full Body Health Checkup\n\nPricing Details (Indicative):\n- General Physician Consultation: $500\n- Dental Check-up: $800\n- Skin & Hair Consultation: $700\n- Pediatric Consultation: $600\n- Full Body Health Checkup: $2,999\n\nFAQs:\n- Q: Do I need an appointment before visiting?\n  A: Yes, appointments are recommended to avoid waiting time.\n\n- Q: What are the clinic working hours?\n  A: Monday to Saturday, 10:00 AM to 7:00 PM.\n\n- Q: Do you accept walk-ins?\n  A: Walk-ins are accepted based on availability, but booking in advance is preferred.\n\n- Q: Is online consultation available?\n  A: Currently, only in-clinic consultations are available.\n\nAfter answering service, pricing, or FAQ-related questions, gently guide the user back to booking by asking:\n\"Would you like to book an appointment?\"\n\nStrict Boundaries:\n- Only discuss appointment booking, clinic services, pricing, and FAQs.\n- Do not answer or engage with unrelated topics (e.g., recipes, general questions, news, weather, jokes, etc.).\n- If the user asks something unrelated (even in a polite or joking way):\n  - Gently remind them of your role and invite them back to booking.\n  - Example: \"I'm here specifically to help you book appointments. Feel free to let me know if you'd like to schedule one!\"\n- If the user continues with irrelevant or abusive messages:\n  - Politely end the conversation by saying:\n    \"It seems you're not looking to book an appointment right now. If you need to schedule one later, feel free to reach out. Have a great day!\"\n\nTone Guidelines:\n- Always stay friendly, polite, professional, and neutral.\n- Never sound judgmental, rude, or confrontational — always assume positive intent first.\n\nBehavior Rules:\n- Redirect unrelated or misuse attempts back to appointment booking.\n- If no appointment-related interest is shown after one gentle redirection, gracefully end the conversation.\n- Avoid giving any general information beyond the provided clinic knowledge base.\n- Always maintain a smooth and human-like conversational flow.\n\nToday's date & time: '{{ $('Set credentials').item.json.currentDateTime }}'\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1288,
+        888
+      ],
+      "id": "209694dc-0b38-427f-84fe-946989026847",
+      "name": "Conversational agent"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"cal_event_type_id\": 5306862,\n  \"cal_api_key\": \"cal_live_1557c131d82b318e34743743c2bd0807\",\n  \"currentDateTime\": \"{{ $('Webhook').item.json?.metadata?.clientCurrentDateTime || new Intl.DateTimeFormat('en-US', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Karachi', timeZoneName: 'long' }).format(new Date()) }}\",\n  \"timezone\": \"{{ $('Webhook').item?.json?.metadata?.clientCurrentTimezone || 'Asia/Karachi' }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        368,
+        688
+      ],
+      "id": "7f01c187-ed6f-4b24-9e97-4e3ad5e5fc6a",
+      "name": "Set credentials"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "42597bc2-1be7-4527-bb29-35473fb3a6cf",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        144,
+        688
+      ],
+      "id": "44433110-4f5a-4f70-9f74-6d2cbe94bbda",
+      "name": "Webhook",
+      "webhookId": "42597bc2-1be7-4527-bb29-35473fb3a6cf"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1904,
+        416
+      ],
+      "id": "f07d057a-7e9e-4f4d-96cb-4a0d35d5d5cc",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1760,
+        888
+      ],
+      "id": "3ac1bb08-d6cc-46fa-a698-767bfa9ede18",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        592,
+        896
+      ],
+      "id": "57e5968f-a883-45a9-a36a-c2eb8ecc275f",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "fNrBulSuGhKeCPQz",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1168,
+        608
+      ],
+      "id": "feb9495e-ab4e-4e1c-a93e-7ff2afc9e64e",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "fNrBulSuGhKeCPQz",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1280,
+        1072
+      ],
+      "id": "fa1203a4-85a7-441e-b759-3a7593ea29a0",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "fNrBulSuGhKeCPQz",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.chatInput }}",
+        "options": {
+          "systemMessage": "=You are an expert intent detection system for an appointment booking workflow. Your task is to analyze the full conversation history between the user and the appointment representative, and based on the user's latest message and the ongoing context, determine the user's intent.\n\nIntent Categories:\n\n- BOOK:\nThe user is initiating a new appointment, requesting to check available slots, providing details for a new booking, clarifying or correcting information for an appointment in progress, or updating/modifying any appointment details (such as name, email, date, or time) before the booking is finalized.\n\nThis includes any requests to check, view, or book available slots for a specific time of day, such as \"morning,\" \"afternoon,\" \"evening,\" \"noon,\" \"midday,\" or \"lunchtime.\"\n\n- CONVERSATION:\nThe user is engaging in general conversation unrelated to booking.\nThis includes:\n- FAQs\n- General questions\n- Questions about services\n- Pricing details\n- Business information\n- Casual or off-topic conversation\n- Clarifications that are NOT about booking an appointment\n\nRules:\n- Always prioritize the user's latest message, but use the entire conversation history to understand the current context and whether an appointment workflow is in progress.\n- Treat any user message that provides, clarifies, or changes appointment details (such as rescheduling, changing time, updating name/email/date/time, or correcting previous info) as BOOK.\n- If the user asks about available slots for any specific time of day—including \"noon,\" \"midday,\" \"lunchtime,\" \"morning,\" \"afternoon,\" or \"evening\"—treat this as booking intent and respond with BOOK.\n- If the user clearly shifts away from appointment-related tasks or discusses unrelated topics, respond with CONVERSATION.\n- If intent is ambiguous but the conversation is in the middle of an appointment workflow, default to BOOK to avoid disrupting the booking process.\n- If the user asks about existing or upcoming appointments, and the system only supports new bookings, respond with CONVERSATION.\n- Do not guess or infer booking intent unless the user explicitly suggests it or the context clearly shows an ongoing booking flow.\n- Your output must be exactly one word: BOOK or CONVERSATION. No other text.\n\nExamples:\n\nBooking-related:\n- User: \"Any in the noon?\" → BOOK\n- User: \"I want to check for noon slots.\" → BOOK\n- User: \"What time slots are available on Friday?\" → BOOK\n- User: \"Can I change my appointment from morning to noon?\" → BOOK\n- User: \"Book a call for tomorrow evening\" → BOOK\n\nConversation-related:\n- User: \"By the way, do you know any good restaurants?\" → CONVERSATION\n- User: \"Wanna know pricing\" → CONVERSATION\n- User: \"Can you tell me your pricing details?\" → CONVERSATION\n- User: \"What services do you offer?\" → CONVERSATION\n- User: \"Wanna know service\" → CONVERSATION\n- User: \"How does this work?\" → CONVERSATION\n- User: \"Is there any discount?\" → CONVERSATION\n\nYour output must be a single word:\nBOOK or CONVERSATION\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        592,
+        688
+      ],
+      "id": "821faee5-965d-4c98-9ee3-1817757720bc",
+      "name": "Router Agent"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Responsible to retrieve all available free appointment slots from database.",
+        "url": "https://api.cal.com/v1/slots",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"startTime\": \"{startTime}\",\n  \"endTime\": \"{endTime}\",\n  \"eventTypeId\": \"{{ $('Set credentials').item.json.cal_event_type_id }}\",\n  \"timeZone\": \"{{ $('Set credentials').item.json.timezone }}\",\n  \"apiKey\": \"{{ $('Set credentials').item.json.cal_api_key }}\"\n}",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "startTime",
+              "description": "Start date string from which to fetch slots, formatted in ISO 8601 and in the UTC timezone. The time should always start at 00:00:00",
+              "type": "string"
+            },
+            {
+              "name": "endTime",
+              "description": "End date string up to which slots should be fetched, formatted in ISO 8601 and in the UTC timezone. The time should always end at 23:59:59",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1488,
+        608
+      ],
+      "id": "556d08ca-859e-4991-b60d-b93d19b5ee97",
+      "name": "retrieve_available_free_slots_from_database1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Responsible for saving appointment into the database.",
+        "method": "POST",
+        "url": "https://api.cal.com/v1/bookings",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"apiKey\": \"{{ $('Set credentials1').item.json.cal_api_key }}\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventTypeId\": {{ $('Set credentials1').item.json.cal_event_type_id }},\n  \"start\": \"{startTime}\",\n  \"responses\": {\n    \"name\": \"{userName}\",\n    \"email\": \"{userEmail}\",\n    \"location\": {\n      \"value\": \"online\",\n      \"optionValue\": \"\"\n    }\n  },\n  \"timeZone\": \"{{ $('Set credentials1').item.json.timezone }}\",\n  \"language\": \"en\",\n  \"metadata\": {}\n}",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "startTime",
+              "description": "Start date string of the appointment picked by user, formatted in ISO 8601 and in the UTC timezone (available inside tool response)",
+              "type": "string"
+            },
+            {
+              "name": "userName",
+              "description": "Full name of the user",
+              "type": "string"
+            },
+            {
+              "name": "userEmail",
+              "description": "Email of the user"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        608
+      ],
+      "id": "750356dd-8839-4242-a53a-1fcca5657854",
+      "name": "book_appointment1"
+    }
+  ],
+  "pinData": {
+    "Router Agent": [
+      {
+        "json": {
+          "cal_event_type_id": 5306862,
+          "cal_api_key": "cal_live_7c99931a071541ad8bdd4c1451612e72",
+          "currentDateTime": "Thu, April 9, 2026 at 07:36:04 PM Pakistan Standard Time",
+          "timezone": "Asia/Karachi",
+          "output": "BOOK"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Conversational agent",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Router Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Conversational agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set credentials": {
+      "main": [
+        [
+          {
+            "node": "Router Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversational agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Appointment Booking Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Router Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Conversational agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router Agent": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "retrieve_available_free_slots_from_database1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "book_appointment1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1,
+    "availableInMCP": false
+  },
+  "versionId": "48c01d33-6bff-48b3-8235-eac5b6a000b2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "75c2faa7346a482b016624091be3092bb97601c53426e726bb4ac0028db54c6a"
+  },
+  "id": "5EN0EEz9O1p9tdxp",
+  "tags": []
+}
